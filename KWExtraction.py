@@ -1,8 +1,8 @@
 '''
-Created on 2017.7.30
+Created on 2017.7.31
 断句;分词;词性标注;主题词提取;关键词提取;
 @author: HDE He na
-Vesion 0.0.1
+Vesion 0.0.2
 Tips:
 需要添加stopwords，词云直接采用TFIDF关键词提取算法
 '''
@@ -55,27 +55,25 @@ ADMORE = grabTxtData('./PolarWords/more.txt') # weight=0.9
 ADLITTLE = grabTxtData('./PolarWords/little.txt') # weight=0.7
 
 def ScoreOfAD(ad, mostDict=ADMOST, veryDict=ADVERY, moreDict=ADMORE, littleDict=ADLITTLE):
-	try:
-		if ad in mostDict:
-			return 2
-		if ad in veryDict:
-			return 1.7
-		if ad in moreDict:
-			return 0.9
-		if ad in littleDict:
-			return 0.7
-	except:
-		print("副词 %s 不在副词词典库中，请人工判断并添加" %(str(ad)))
+	if ad in mostDict:
+		return 2
+	elif ad in veryDict:
+		return 1.7
+	elif ad in moreDict:
+		return 0.9
+	elif ad in littleDict:
+		return 0.7
+	else:
+		print("副词 %s 不在副词词典库中，请人工判断并添加... \n" %(str(ad)))
 		return 1 
 
 def ScoreOfPolar(word, negDict1=CNnegComentWords, negDict2=CNnegSentimentWords, posDict1=CNposComentWords, posDict2=CNposSentimentWords):
-	try:
-		if word in negDict1 or word in negDict2:
-			return -1
-		if word in posDict1 or word in posDict2:
-			return 1
-	except:
-		print("词 %s 不在情感词典库中，请人工判断并添加" %(str(word)))
+	if word in negDict1 or word in negDict2:
+		return -1
+	elif word in posDict1 or word in posDict2:
+		return 1
+	else:
+		print("词 %s 不在情感词典库中，请人工判断并添加... \n" %(str(word)))
 		return 0
 
 def getCommentSingleData(alldata, key='具体评论'):
@@ -145,7 +143,6 @@ def IsNoun3Phrasses(flag,index):
 	# 动名词组合 这个不知道主要组成暂定
 	return False
 
-所有的极性词有
 def SentenceSegmentation(comment,pointslist=POINTSLIST):
 	'''
 	sentence segmentation:comment(str) -->sentence(list)
@@ -189,8 +186,9 @@ def SentenceSegmentation(comment,pointslist=POINTSLIST):
 
 def printSegmentation(sentencelist):
 	# [a,...,b] --> a/.../b  
-	for item in sentencelist:
-		print(item + '/')
+	#for item in sentencelist:
+		#print(item + '/')
+	print("/".join(sentencelist))
 
 def getTopicAndPolarWords(comment):
 	# 返回的第一个是主题词对：[(主题词，极性词),(),...,()]
@@ -203,51 +201,54 @@ def getTopicAndPolarWords(comment):
 	NumOfPos, NumOfNeg = 0, 0
 	ScoreOfPos, ScoreOfNeg = 0, 0
 	ScoreOfSent = []
+	AdjLists = []
 	Sentence = SentenceSegmentation(comment)
-	print("=========================================================")
 	print("断句结果为：")
 	printSegmentation(Sentence)
+	print("=========================================================")
 
 	for s in Sentence:
 		Word, Flag, AdjIndex = getAdjIndex(s)
-		for adj in AdjIndex:
-			S = ScoreOfPolar(Word[adj]) #这个词的极性
-			AD1, AD2 = 1, 1
-			# 根据评论中常用的语法模式提取主题词+极性词
-			try: # adj+uj+n
+		if len(AdjIndex) > 0:
+			for adj in AdjIndex:
+				AdjLists.append(Word[adj])
+				S = ScoreOfPolar(Word[adj]) #这个词的极性
+				AD1, AD2 = 1, 1
+				# 根据评论中常用的语法模式提取主题词+极性词
+				# adj+uj+n
 				if Flag[adj+1] == 'uj':
+					# 判断是否是2个字符的名词短语
 					if IsNoun2Phrasses(Flag,adj+2):
 						# 漂亮的摆饰
 						addWord = Word[adj+2]+Word[adj+3]
 						TopicAndPolar.append((addWord, Word[adj]))
 						# [([3,2],1)] --> topic是index 3到5,polar是 1
-						TAPIndex.append(([adj+2,2],adj))	
-					else:
-						if IsNoun3Phrasses(Flag,adj+2):
-							addWord = Word[adj+2] + Word[adj+3] + Word[adj+4]
-							TopicAndPolar.append((addWord, Word[adj]))
-							TAPIndex.append(([adj+2, 3], adj))
-						elif Flag[adj+2] == 'n':
-							TopicAndPolar.append((Word[adj+2], Word[adj]))
-							TAPIndex.append(([adj+2, 1], adj))
-		    # n+adj
-			except: 
-				if IsNoun2Phrasses(Flag, adj-2):
+						TAPIndex.append(([adj+2,2],adj))
+					# 判断是否是3个字符的名词短语	
+					elif IsNoun3Phrasses(Flag,adj+2):
+						addWord = Word[adj+2] + Word[adj+3] + Word[adj+4]
+						TopicAndPolar.append((addWord, Word[adj]))
+						TAPIndex.append(([adj+2, 3], adj))
+					# 判断是否是单个名词
+					elif Flag[adj+2] == 'n':
+						TopicAndPolar.append((Word[adj+2], Word[adj]))
+						TAPIndex.append(([adj+2, 1], adj))
+
+		    	# n+adj 
+				elif IsNoun2Phrasses(Flag, adj-2):
 					addTopic = Word[adj-2] + Word[adj-1]
 					TopicAndPolar.append((addTopic, Word[adj]))
 					TAPIndex.append(([adj-2, 2], adj))
-				else:
-					if IsNoun3Phrasses(Flag, adj-3):
-						addTopic = Word[adj-3] + Word[adj-2] + Word[adj-1]
-						TopicAndPolar.append((addTopic, Word[adj]))
-						TAPIndex.append(([adj-3, 3], adj))
-					else:
-						if Flag[adj-1] == 'n':
-							TopicAndPolar.append((Word[adj-1], Word[adj]))
-							TAPIndex.append(([adj-1,1], adj))
-			# n+adv+adj & n+adv+adv+adj
-			try: 
-				if Flag[adj-1] == 'd' or Flag[adj-1] == 'ad':
+				elif IsNoun3Phrasses(Flag, adj-3):
+					addTopic = Word[adj-3] + Word[adj-2] + Word[adj-1]
+					TopicAndPolar.append((addTopic, Word[adj]))
+					TAPIndex.append(([adj-3, 3], adj))
+				elif Flag[adj-1] == 'n':
+					TopicAndPolar.append((Word[adj-1], Word[adj]))
+					TAPIndex.append(([adj-1,1], adj))
+
+				# n+adv+adj & n+adv+adv+adj 
+				elif Flag[adj-1] == 'd' or Flag[adj-1] == 'ad':
 					AD1 = ScoreOfAD(Flag[adj-1])
 					if Flag[adj-2] == 'd' or Flag[adj-2] == 'ad':
 						AD2 = ScoreOfAD(Flag[adj-2]) # 第二个副词的程度
@@ -255,52 +256,48 @@ def getTopicAndPolarWords(comment):
 							addTopic = Word[adj-4] + Word[adj-3]
 							TopicAndPolar.append((addTopic,Word[adj]))
 							TAPIndex.append(([adj-4, 2], adj))
-						else:
-							if IsNoun3Phrasses(Flag, adj-5):
-								addTopic = Word[adj-5]+Word[adj-4]+Word[adj-3]
-								TopicAndPolar.append((addTopic, Word[adj]))
-								TAPIndex.append(([adj-5, 3], adj))
-							else:
-								if Flag[adj-3] == 'n':
-									TopicAndPolar.append((Word[adj-3], Word[adj]))
-									TAPIndex.append(([adj-3, 1], adj))
-					else:
-						if IsNoun2Phrasses(Flag, adj-3):
-							addTopic = Word[adj-3] + Word[adj-2]
+						elif IsNoun3Phrasses(Flag, adj-5):
+							addTopic = Word[adj-5]+Word[adj-4]+Word[adj-3]
 							TopicAndPolar.append((addTopic, Word[adj]))
-							TAPIndex.append(([adj-3, 2], adj))
-						else:
-							if IsNoun3Phrasses(Flag, adj-4):
-								addTopic = Word[adj-4]+Word[adj-3]+Word[adj-2]
-								TopicAndPolar.append((addTopic, Word[adj]))
-								TAPIndex.append(([adj-4, 3], adj))
-							else:
-								if Flag[adj-2] == 'n':
-									TopicAndPolar.append((Word[adj-2], Word[adj]))
-									TAPIndex.append(([adj-2, 1], adj))
-			except:
-				print("形容词%s无匹配,原句为:%s" %(str(Word[adj]), str(s))) # 应该输出哪一个词没有匹配需要人工审查
-			if S == 1:
-				NumOfPos += 1
-				ScoreOfPos += AD1 * AD2
-			if S == -1:
-				NumOfNeg += 1
-				#ScoreOfNeg += (-1) * AD1 * AD2
-			# ScoreOfSent += S * AD1 * AD2
+							TAPIndex.append(([adj-5, 3], adj))
+						elif Flag[adj-3] == 'n':
+							TopicAndPolar.append((Word[adj-3], Word[adj]))
+							TAPIndex.append(([adj-3, 1], adj))
+					elif IsNoun2Phrasses(Flag, adj-3):
+						addTopic = Word[adj-3] + Word[adj-2]
+						TopicAndPolar.append((addTopic, Word[adj]))
+						TAPIndex.append(([adj-3, 2], adj))
+					elif IsNoun3Phrasses(Flag, adj-4):
+						addTopic = Word[adj-4]+Word[adj-3]+Word[adj-2]
+						TopicAndPolar.append((addTopic, Word[adj]))
+						TAPIndex.append(([adj-4, 3], adj))
+					elif Flag[adj-2] == 'n':
+						TopicAndPolar.append((Word[adj-2], Word[adj]))
+						TAPIndex.append(([adj-2, 1], adj))
+				else:
+					print("形容词 %s 无匹配,原句为:%s ...\n" %(str(Word[adj]), str(s))) # 应该输出哪一个词没有匹配需要人工审查
+				if S == 1:
+					NumOfPos += 1
+					ScoreOfPos += AD1 * AD2
+				if S == -1:
+					NumOfNeg += 1
+					ScoreOfNeg += (-1) * AD1 * AD2
+	ScoreOfSent = ScoreOfNeg + ScoreOfPos
 	#return TopicAndPolar, TAPIndex, ScoreOfSent
-	return TopicAndPolar, TAPIndex
+	print("所有的极性词有:", str(AdjLists))
+	print("=========================================================")
+	return TopicAndPolar, TAPIndex, ScoreOfSent
 
 def main():
 	comment = input("请输入测试的评论：")
 	keywordslist = jieba.analyse.extract_tags(comment, topK=6, withWeight=False, allowPOS=())
+	print("=========================================================")
 	print("整个评论中的关键词如下：", str(keywordslist))
 	print("=========================================================")
-	#print("=========================================================")
-	#TopicAndPolar, TAPIndex, ScoreOfSent = getTopicAndPolarWords(comment)
-	TopicAndPolar, TAPIndex = getTopicAndPolarWords(comment)
-	#print("该评论的情感强烈程度分数为：")
-	#print(ScoreOfSent)
-	#print("=========================================================")
+	TopicAndPolar, TAPIndex, ScoreOfSent = getTopicAndPolarWords(comment)
+	# TopicAndPolar, TAPIndex = getTopicAndPolarWords(comment)
+	print("该评论的情感强烈程度分数为：", str(ScoreOfSent))
+	print("=========================================================")
 	print("具体意见有如下：", TopicAndPolar)
 	print("=========================================================")
 
